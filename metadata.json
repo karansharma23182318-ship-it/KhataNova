@@ -1,0 +1,6 @@
+{
+  "name": "KhataNova - Smart Dukaan Manager",
+  "description": "Smart Dukaan Manager for Indian shopkeepers: daily sales, cash, UPI, udhaar digital khata, customer ledgers, reports, and GST-ready shop management.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

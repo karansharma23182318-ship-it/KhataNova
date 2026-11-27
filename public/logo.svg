@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="kn_grad" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#06B6D4" />
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="#0B1633" stroke="url(#kn_grad)" stroke-width="2.5" />
+  <path d="M20 18V46M20 32L36 18M25 27.5L39 46" stroke="#F8FAFC" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="44" cy="22" r="4.5" fill="#06B6D4" />
+</svg>

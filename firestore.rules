@@ -1,0 +1,287 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Deny all access unless explicitly matched below
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isVerifiedOwner(shopId) {
+      return isSignedIn()
+        && request.auth.uid == shopId
+        && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidReminderSettings(data, shopId) {
+      return data.keys().hasAll(['enabled', 'intervalDays', 'browserPushEnabled', 'ownerUid', 'updatedAt'])
+        && data.keys().hasOnly(['enabled', 'intervalDays', 'browserPushEnabled', 'ownerUid', 'updatedAt'])
+        && data.enabled is bool
+        && data.browserPushEnabled is bool
+        && data.intervalDays is number
+        && data.intervalDays >= 1
+        && data.intervalDays <= 365
+        && data.ownerUid == request.auth.uid
+        && data.ownerUid == shopId
+        && data.updatedAt is string
+        && data.updatedAt.size() <= 64;
+    }
+
+    function isValidDueNotification(data, shopId, notifId) {
+      return data.keys().hasAll([
+          'id', 'shopId', 'ownerUid', 'customerId', 'customerName', 'pendingAmount',
+          'dueDate', 'anchorDate', 'intervalDays', 'cycleNumber', 'dedupeKey',
+          'status', 'isRead', 'actionUrl', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'shopId', 'ownerUid', 'customerId', 'customerName', 'pendingAmount',
+          'dueDate', 'anchorDate', 'intervalDays', 'cycleNumber', 'dedupeKey',
+          'status', 'isRead', 'readAt', 'clearedAt', 'actionUrl', 'createdAt', 'updatedAt'
+        ])
+        && data.id == notifId
+        && data.shopId == shopId
+        && data.ownerUid == request.auth.uid
+        && isValidId(data.customerId)
+        && data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 160
+        && data.pendingAmount is number && data.pendingAmount >= 0
+        && data.dueDate is string && data.dueDate.size() <= 64
+        && data.anchorDate is string && data.anchorDate.size() <= 64
+        && data.intervalDays is number && data.intervalDays >= 1 && data.intervalDays <= 365
+        && data.cycleNumber is number && data.cycleNumber >= 1
+        && data.dedupeKey is string && data.dedupeKey.size() >= 3 && data.dedupeKey.size() <= 256
+        && (data.status == 'active' || data.status == 'cleared')
+        && data.isRead is bool
+        && (!('readAt' in data) || (data.readAt is string && data.readAt.size() <= 64))
+        && (!('clearedAt' in data) || (data.clearedAt is string && data.clearedAt.size() <= 64))
+        && data.actionUrl is string && data.actionUrl.size() <= 200
+        && data.createdAt is string && data.createdAt.size() <= 64
+        && data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidFcmToken(data, shopId) {
+      return data.keys().hasAll(['token', 'ownerUid', 'platform', 'updatedAt'])
+        && data.keys().hasOnly(['token', 'ownerUid', 'platform', 'updatedAt'])
+        && data.token is string && data.token.size() >= 10 && data.token.size() <= 1024
+        && data.ownerUid == request.auth.uid
+        && data.ownerUid == shopId
+        && data.platform is string && data.platform.size() <= 64
+        && data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidGlobalProductFields(data) {
+      return data.keys().hasAll(['barcode', 'name', 'unit', 'source', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'barcode', 'name', 'brand', 'packSize', 'categories',
+          'imageUrl', 'unit', 'suggestedPrice', 'source',
+          'createdByUid', 'createdAt', 'updatedAt'
+        ])
+        && data.barcode is string && data.barcode.size() >= 4 && data.barcode.size() <= 64
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 240
+        && (!('brand' in data) || (data.brand is string && data.brand.size() <= 160))
+        && (!('packSize' in data) || (data.packSize is string && data.packSize.size() <= 120))
+        && (!('categories' in data) || (data.categories is string && data.categories.size() <= 500))
+        && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 450000))
+        && data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 32
+        && (!('suggestedPrice' in data) || (data.suggestedPrice is number && data.suggestedPrice >= 0))
+        && (data.source == 'community' || data.source == 'openfoodfacts')
+        && (!('createdByUid' in data) || isValidId(data.createdByUid))
+        && data.createdAt is string && data.createdAt.size() <= 64
+        && data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    function isValidGlobalProductCreate(data) {
+      return isValidGlobalProductFields(data)
+        && (!('createdByUid' in data) || data.createdByUid == request.auth.uid);
+    }
+
+    function isValidGlobalProductUpdate(data, ex) {
+      return isValidGlobalProductFields(data)
+        && data.barcode == ex.barcode
+        && data.createdAt == ex.createdAt
+        && (!('createdByUid' in ex) || data.createdByUid == ex.createdByUid)
+        && (
+          // Creator updating shared global metadata (including name/unit/packSize/categories/imageUrl/suggestedPrice)
+          ('createdByUid' in ex && ex.createdByUid == request.auth.uid)
+          || (
+            // Non-creator verified shopkeeper enriching missing shared metadata without overwriting canonical name or suggestedPrice
+            data.name == ex.name
+            && (!('suggestedPrice' in ex) || data.suggestedPrice == ex.suggestedPrice)
+            && (!('packSize' in ex) || data.packSize == ex.packSize)
+            && data.diff(ex).affectedKeys().hasOnly([
+              'brand', 'packSize', 'categories', 'imageUrl', 'suggestedPrice', 'updatedAt'
+            ])
+          )
+        );
+    }
+
+    function isValidNovaProduct(data, shopId, productId) {
+      return data.keys().hasAll([
+          'id', 'shopId', 'name', 'unit', 'source', 'batches', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'shopId', 'barcode', 'name', 'brand', 'packSize', 'categories',
+          'imageUrl', 'unit', 'sellingPrice', 'source', 'batches', 'createdAt', 'updatedAt'
+        ])
+        && data.id == productId
+        && data.shopId == shopId
+        && (!('barcode' in data) || (data.barcode is string && data.barcode.size() >= 4 && data.barcode.size() <= 64))
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 240
+        && (!('brand' in data) || (data.brand is string && data.brand.size() <= 160))
+        && (!('packSize' in data) || (data.packSize is string && data.packSize.size() <= 120))
+        && (!('categories' in data) || (data.categories is string && data.categories.size() <= 500))
+        && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 450000))
+        && data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 32
+        && (!('sellingPrice' in data) || (data.sellingPrice is number && data.sellingPrice >= 0))
+        && (data.source == 'global' || data.source == 'openfoodfacts' || data.source == 'manual' || data.source == 'shop')
+        && data.batches is list && data.batches.size() <= 200
+        && data.createdAt is string && data.createdAt.size() <= 64
+        && data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    // Shared Global Product Database (readable & creatable by verified signed-in shopkeepers;
+    // canonical name & suggestedPrice cannot be overwritten by other shops)
+    match /globalProducts/{productKey} {
+      allow get: if isSignedIn()
+        && request.auth.token.email_verified == true
+        && isValidId(productKey);
+      allow list: if isSignedIn()
+        && request.auth.token.email_verified == true
+        && resource.data.barcode is string
+        && resource.data.name is string;
+      allow create: if isSignedIn()
+        && request.auth.token.email_verified == true
+        && isValidId(productKey)
+        && isValidGlobalProductCreate(incoming());
+      allow update: if isSignedIn()
+        && request.auth.token.email_verified == true
+        && isValidId(productKey)
+        && isValidGlobalProductUpdate(incoming(), existing());
+      allow delete: if false;
+    }
+
+    // Shopkeeper root document & subcollections (strict owner-only isolation)
+    match /shops/{shopId} {
+      allow get: if isValidId(shopId) && isVerifiedOwner(shopId);
+      allow create, update: if isValidId(shopId)
+        && isVerifiedOwner(shopId)
+        && incoming().ownerUid == request.auth.uid;
+
+      match /reminderSettings/{settingId} {
+        allow get: if isValidId(shopId) && isValidId(settingId) && isVerifiedOwner(shopId);
+        allow list: if isVerifiedOwner(shopId) && resource.data.ownerUid == request.auth.uid;
+        allow create: if isValidId(shopId)
+          && isValidId(settingId)
+          && isVerifiedOwner(shopId)
+          && isValidReminderSettings(incoming(), shopId);
+        allow update: if isValidId(shopId)
+          && isValidId(settingId)
+          && isVerifiedOwner(shopId)
+          && isValidReminderSettings(incoming(), shopId)
+          && incoming().ownerUid == existing().ownerUid
+          && incoming().diff(existing()).affectedKeys().hasOnly(['enabled', 'intervalDays', 'browserPushEnabled', 'updatedAt']);
+      }
+
+      match /notifications/{notificationId} {
+        allow get: if isValidId(shopId) && isValidId(notificationId) && isVerifiedOwner(shopId);
+        allow list: if isVerifiedOwner(shopId) && resource.data.ownerUid == request.auth.uid;
+        allow create: if isValidId(shopId)
+          && isValidId(notificationId)
+          && isVerifiedOwner(shopId)
+          && isValidDueNotification(incoming(), shopId, notificationId);
+        allow update: if isValidId(shopId)
+          && isValidId(notificationId)
+          && isVerifiedOwner(shopId)
+          && isValidDueNotification(incoming(), shopId, notificationId)
+          && incoming().id == existing().id
+          && incoming().shopId == existing().shopId
+          && incoming().ownerUid == existing().ownerUid
+          && incoming().customerId == existing().customerId
+          && incoming().createdAt == existing().createdAt
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly(['isRead', 'readAt', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'pendingAmount', 'clearedAt', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['customerName', 'updatedAt'])
+          );
+        allow delete: if isValidId(shopId)
+          && isValidId(notificationId)
+          && isVerifiedOwner(shopId)
+          && existing().status == 'cleared';
+      }
+
+      match /fcmTokens/{tokenId} {
+        allow get: if isValidId(shopId) && isValidId(tokenId) && isVerifiedOwner(shopId);
+        allow list: if isVerifiedOwner(shopId) && resource.data.ownerUid == request.auth.uid;
+        allow create, update: if isValidId(shopId)
+          && isValidId(tokenId)
+          && isVerifiedOwner(shopId)
+          && isValidFcmToken(incoming(), shopId);
+        allow delete: if isValidId(shopId) && isValidId(tokenId) && isVerifiedOwner(shopId);
+      }
+
+      // Customers, sales, payments, and ledger mirrored per shopkeeper
+      match /customers/{customerId} {
+        allow get: if isValidId(shopId) && isValidId(customerId) && isVerifiedOwner(shopId);
+        allow list: if isVerifiedOwner(shopId) && resource.data.shopId == shopId;
+        allow create, update: if isValidId(shopId)
+          && isValidId(customerId)
+          && isVerifiedOwner(shopId)
+          && incoming().shopId == shopId;
+      }
+
+      match /sales/{saleId} {
+        allow get: if isValidId(shopId) && isValidId(saleId) && isVerifiedOwner(shopId);
+        allow list: if isVerifiedOwner(shopId) && resource.data.shopId == shopId;
+        allow create, update: if isValidId(shopId)
+          && isValidId(saleId)
+          && isVerifiedOwner(shopId)
+          && incoming().shopId == shopId
+          && incoming().createdByUid == request.auth.uid;
+      }
+
+      match /payments/{paymentId} {
+        allow get: if isValidId(shopId) && isValidId(paymentId) && isVerifiedOwner(shopId);
+        allow list: if isVerifiedOwner(shopId) && resource.data.shopId == shopId;
+        allow create: if isValidId(shopId)
+          && isValidId(paymentId)
+          && isVerifiedOwner(shopId)
+          && incoming().shopId == shopId
+          && incoming().createdByUid == request.auth.uid;
+      }
+
+      match /ledger/{entryId} {
+        allow get: if isValidId(shopId) && isValidId(entryId) && isVerifiedOwner(shopId);
+        allow list: if isVerifiedOwner(shopId) && resource.data.shopId == shopId;
+        allow create: if isValidId(shopId)
+          && isValidId(entryId)
+          && isVerifiedOwner(shopId)
+          && incoming().shopId == shopId
+          && incoming().createdByUid == request.auth.uid;
+      }
+
+      match /novaProducts/{productId} {
+        allow get: if isValidId(shopId) && isValidId(productId) && isVerifiedOwner(shopId);
+        allow list: if isVerifiedOwner(shopId) && resource.data.shopId == shopId;
+        allow create, update: if isValidId(shopId)
+          && isValidId(productId)
+          && isVerifiedOwner(shopId)
+          && isValidNovaProduct(incoming(), shopId, productId);
+        allow delete: if isValidId(shopId) && isValidId(productId) && isVerifiedOwner(shopId);
+      }
+    }
+  }
+}

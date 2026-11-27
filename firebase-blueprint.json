@@ -1,0 +1,136 @@
+{
+  "entities": {
+    "DueReminderSettings": {
+      "title": "DueReminderSettings",
+      "description": "Shopkeeper-only automatic Udhaar due reminder configuration.",
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Enable or pause automatic due reminders" },
+        "intervalDays": { "type": "number", "description": "Reminder interval in days (default 7, range 1-365)" },
+        "browserPushEnabled": { "type": "boolean", "description": "Whether shopkeeper enabled browser push alerts" },
+        "ownerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
+      },
+      "required": ["enabled", "intervalDays", "browserPushEnabled", "ownerUid", "updatedAt"]
+    },
+    "DueReminderNotification": {
+      "title": "DueReminderNotification",
+      "description": "Shopkeeper-only due reminder notification and history item pointing to customer ledger.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "shopId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "customerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "customerName": { "type": "string", "maxLength": 160 },
+        "pendingAmount": { "type": "number" },
+        "dueDate": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "anchorDate": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "intervalDays": { "type": "number" },
+        "cycleNumber": { "type": "number" },
+        "dedupeKey": { "type": "string", "maxLength": 256 },
+        "status": { "type": "string", "enum": ["active", "cleared"] },
+        "isRead": { "type": "boolean" },
+        "readAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "clearedAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "actionUrl": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
+      },
+      "required": [
+        "id",
+        "shopId",
+        "ownerUid",
+        "customerId",
+        "customerName",
+        "pendingAmount",
+        "dueDate",
+        "anchorDate",
+        "intervalDays",
+        "cycleNumber",
+        "dedupeKey",
+        "status",
+        "isRead",
+        "actionUrl",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "FcmToken": {
+      "title": "FcmToken",
+      "description": "Browser push registration token belonging strictly to the logged-in shopkeeper.",
+      "type": "object",
+      "properties": {
+        "token": { "type": "string", "maxLength": 1024 },
+        "ownerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "platform": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
+      },
+      "required": ["token", "ownerUid", "platform", "updatedAt"]
+    },
+    "GlobalProduct": {
+      "title": "GlobalProduct",
+      "description": "Shared Global Product catalog keyed by safe barcode document ID so all shopkeepers recognize products saved by any shopkeeper.",
+      "type": "object",
+      "properties": {
+        "barcode": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 240 },
+        "brand": { "type": "string", "maxLength": 160 },
+        "packSize": { "type": "string", "maxLength": 120 },
+        "categories": { "type": "string", "maxLength": 500 },
+        "imageUrl": { "type": "string", "maxLength": 450000 },
+        "unit": { "type": "string", "maxLength": 32 },
+        "suggestedPrice": { "type": "number" },
+        "source": { "type": "string", "enum": ["community", "openfoodfacts"] },
+        "createdByUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
+      },
+      "required": ["barcode", "name", "unit", "source", "createdAt", "updatedAt"]
+    },
+    "NovaProduct": {
+      "title": "NovaProduct",
+      "description": "Private shop-specific product catalog override (custom price, custom name, batches) isolated per shopId.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "shopId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "barcode": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 240 },
+        "brand": { "type": "string", "maxLength": 160 },
+        "packSize": { "type": "string", "maxLength": 120 },
+        "categories": { "type": "string", "maxLength": 500 },
+        "imageUrl": { "type": "string", "maxLength": 450000 },
+        "unit": { "type": "string", "maxLength": 32 },
+        "sellingPrice": { "type": "number" },
+        "source": { "type": "string", "enum": ["global", "openfoodfacts", "manual", "shop"] },
+        "batches": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time", "maxLength": 64 },
+        "updatedAt": { "type": "string", "format": "date-time", "maxLength": 64 }
+      },
+      "required": ["id", "shopId", "name", "unit", "source", "batches", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/globalProducts/{productKey}": {
+      "schema": { "$ref": "#/entities/GlobalProduct" },
+      "description": "Shared Global Product Database readable across all verified shopkeepers without cross-shop overwriting of canonical names or suggested prices."
+    },
+    "/shops/{shopId}/novaProducts/{productId}": {
+      "schema": { "$ref": "#/entities/NovaProduct" },
+      "description": "Shop-private Nova Scan product overrides (custom price, custom name, and batch expiry tracking)."
+    },
+    "/shops/{shopId}/reminderSettings/{settingId}": {
+      "schema": { "$ref": "#/entities/DueReminderSettings" },
+      "description": "Shopkeeper-only automatic reminder interval and enablement settings."
+    },
+    "/shops/{shopId}/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/DueReminderNotification" },
+      "description": "Shopkeeper-only due reminder alerts and notification history."
+    },
+    "/shops/{shopId}/fcmTokens/{tokenId}": {
+      "schema": { "$ref": "#/entities/FcmToken" },
+      "description": "Registered browser push tokens belonging to the logged-in shopkeeper."
+    }
+  }
+}
